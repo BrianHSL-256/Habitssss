@@ -13,3 +13,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   await cached.db; 
   return app(req, res);
 }
+
