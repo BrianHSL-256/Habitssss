@@ -3,10 +3,8 @@
   "builds": [
     {
       "src": "api/index.ts",
-      "use": "@vercel/node", 
-      "config": {
-        "includeFiles": "assets/**"
-      }
+      "use": "@vercel/node"
+    
     }
   ],
   "routes": [
