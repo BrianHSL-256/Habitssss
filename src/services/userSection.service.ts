@@ -27,7 +27,7 @@ export const setUserSection = async (
 
   return UserSection.findOneAndUpdate(
     { userId, sectionId: section._id },
-    { $set: { isEnabled }, $setOnInsert: { userId, sectionId: section._id } },
+    { $set: { isAvalable: isEnabled }, $setOnInsert: { userId, sectionId: section._id } },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).lean();
 };
