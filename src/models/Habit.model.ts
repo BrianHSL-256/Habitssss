@@ -34,7 +34,7 @@ export interface IHabit {
   daysOfWeek: number[];
   targetPerWeek?: number | null;
 
-  color?: string;
+
   position: number;
   archivedAt?: Date | null;
   createdAt: Date;
@@ -147,12 +147,13 @@ const habitSchema = new Schema<IHabit>(
     },
 
     /* ---------- UI ---------- */
-    color: {
-      type: String,
-      trim: true,
-      maxlength: 9,
-      match: [HEX_COLOR_RE, 'Color inválido (usa formato hex: #CCFF00)'],
-    },
+    // color: {
+    //   type: String,
+    //   trim: true,
+    //   maxlength: 9,
+    //   match: [HEX_COLOR_RE, 'Color inválido (usa formato hex: #CCFF00)'],
+    // },
+
     position: {
       type: Number,
       default: 0,
