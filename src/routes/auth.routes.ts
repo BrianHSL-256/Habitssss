@@ -10,25 +10,10 @@ import { body } from 'express-validator';
 const router = Router();
 
 // Ruta de Registro con validaciones básicas
-router.post(
-    '/register',
-    [
-        body('name').notEmpty().withMessage('Name is required'),
-        body('email').isEmail().withMessage('Must be a valid email'),
-        body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
-    ],
-    register
-);
+router.post('/register', register);
 
 // Ruta de Inicio de Sesión
-router.post(
-    '/login',
-    [
-        body('email').isEmail().withMessage('Must be a valid email'),
-        body('password').notEmpty().withMessage('Password is required')
-    ],
-    login
-);
+router.post('/login',login);
 
 // Ruta para Refrescar el Access Token
 router.post('/refresh-token', refreshToken);

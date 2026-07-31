@@ -96,7 +96,7 @@ export const login = async (req: Request, res: Response) =>{
 
     if (normalizedEmail) query.push({ email: normalizedEmail });
 
-    const user = await User.findOne({ $or: query });
+    const user = await User.findOne({ $or: query }).select('+password');;
 
     if(!user){
         return res.status(400).json({message: "Invalid credentials"});
