@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import userSectionRoutes from './routes/userSection.routes';
 import categoryHabitRoutes from './routes/categoryHabit.routes';
+import habitRoutes from './routes/habit.routes';
 
 const app = express();
 
@@ -29,7 +30,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/sections', userSectionRoutes);
 app.use('/api/habitCategories', categoryHabitRoutes);
-app.use('/api/habit', categoryHabitRoutes);
+app.use('/api/habit', habitRoutes);
 
 export default app;
 
