@@ -1,5 +1,4 @@
 import { Schema, model, Types } from 'mongoose';
-import { HEX_COLOR_RE } from './CategoryHabit.model';
 
 /* ============================================================
    ENUMS
@@ -26,23 +25,25 @@ export interface IHabit {
   name: string;
 
   trackingType: HabitTrackingType;
+
+  /** quantity/duration: meta numérica. Con targetValueMax define un RANGO */
   targetValue?: number | null;
+  targetValueMax?: number | null;
   unit?: string | null;
-  targetTime?: string | null; // 'HH:mm' en la timezone del usuario
+
+  /** time: 'HH:mm' en la timezone del usuario. Con targetTimeMax define una VENTANA */
+  targetTime?: string | null;
+  targetTimeMax?: string | null;
 
   frequency: HabitFrequency;
   daysOfWeek: number[];
   targetPerWeek?: number | null;
-
 
   position: number;
   archivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
-
-
-
 
 /* ============================================================
    HELPERS
@@ -97,6 +98,14 @@ const habitSchema = new Schema<IHabit>(
         'targetValue es obligatorio para hábitos de cantidad o duración',
       ],
     },
+    /** Si viene, la meta es un RANGO: [targetValue, targetValueMax] */
+    targetValueMax: {
+      type: Number,
+      min: [0, 'El máximo no puede ser negativo'],
+      max: 99_999_999.99,
+      default: null,
+      set: round2,
+    },
     unit: {
       type: String,
       trim: true,
@@ -114,6 +123,13 @@ const habitSchema = new Schema<IHabit>(
         },
         'targetTime es obligatorio para hábitos de tipo hora',
       ],
+    },
+    /** Si viene, la meta es una VENTANA: [targetTime, targetTimeMax] */
+    targetTimeMax: {
+      type: String,
+      trim: true,
+      default: null,
+      match: [TIME_RE, 'targetTimeMax debe ir en formato HH:mm (24h)'],
     },
 
     /* ---------- Cada cuándo ---------- */
@@ -146,14 +162,6 @@ const habitSchema = new Schema<IHabit>(
       ],
     },
 
-    /* ---------- UI ---------- */
-    // color: {
-    //   type: String,
-    //   trim: true,
-    //   maxlength: 9,
-    //   match: [HEX_COLOR_RE, 'Color inválido (usa formato hex: #CCFF00)'],
-    // },
-
     position: {
       type: Number,
       default: 0,
@@ -175,12 +183,59 @@ const habitSchema = new Schema<IHabit>(
 );
 
 /* ============================================================
+   VALIDACIÓN DE RANGOS
+   Hook async que LANZA el error en vez de usar next(): así se
+   evitan los overloads de Mongoose que hacen que TS infiera
+   `next` como Record<string, any> ("no es invocable").
+   Aquí `this` es el documento hidratado y está bien tipado.
+   ============================================================ */
+
+habitSchema.pre('validate', async function () {
+  // Rango numérico: el máximo debe superar al mínimo
+  if (this.targetValueMax != null) {
+    if (this.targetValue == null) {
+      throw new Error('targetValueMax requiere un targetValue');
+    }
+    if (this.targetValueMax <= this.targetValue) {
+      throw new Error('targetValueMax debe ser mayor que targetValue');
+    }
+  }
+
+  // Ventana horaria: comparar 'HH:mm' como string funciona porque
+  // el formato de 24h con ceros a la izquierda es ordenable
+  if (this.targetTimeMax) {
+    if (!this.targetTime) {
+      throw new Error('targetTimeMax requiere un targetTime');
+    }
+    if (this.targetTimeMax <= this.targetTime) {
+      throw new Error('targetTimeMax debe ser posterior a targetTime');
+    }
+  }
+
+  // Los hábitos de check no llevan meta de ningún tipo
+  if (this.trackingType === 'check') {
+    if (this.targetValue != null || this.targetTime) {
+      throw new Error('Los hábitos de tipo check no admiten meta');
+    }
+  }
+});
+
+/* ============================================================
+   VIRTUALS
+   ============================================================ */
+
+/** true si la meta del hábito está definida como rango/ventana */
+habitSchema.virtual('isRange').get(function () {
+  return this.targetValueMax != null || this.targetTimeMax != null;
+});
+
+/* ============================================================
    ÍNDICES
    ============================================================ */
 
 habitSchema.index({ userId: 1, archivedAt: 1, position: 1 });
 habitSchema.index({ categoryId: 1 });
-
+habitSchema.index({ userId: 1, categoryId: 1, position: 1 });
 
 export const Habit = model<IHabit>('Habit', habitSchema);
 

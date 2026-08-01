@@ -29,6 +29,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/sections', userSectionRoutes);
 app.use('/api/habitCategories', categoryHabitRoutes);
+app.use('/api/habit', categoryHabitRoutes);
 
 export default app;
 
