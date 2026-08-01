@@ -4,6 +4,8 @@ import authRoutes from './routes/auth.routes';
 import userSectionRoutes from './routes/userSection.routes';
 import categoryHabitRoutes from './routes/categoryHabit.routes';
 import habitRoutes from './routes/habit.routes';
+import habitRegisterRoutes from './routes/habitRegister.routes';
+
 
 const app = express();
 
@@ -31,6 +33,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sections', userSectionRoutes);
 app.use('/api/habitCategories', categoryHabitRoutes);
 app.use('/api/habit', habitRoutes);
+app.use('/api/habitRegister', habitRegisterRoutes);
 
 export default app;
 
