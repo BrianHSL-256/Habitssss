@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import userSectionRoutes from './routes/userSection.routes';
+import categoryHabitRoutes from './routes/categoryHabit.routes';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/sections', userSectionRoutes);
+app.use('/api/habitCategories', categoryHabitRoutes);
 
 export default app;
 
