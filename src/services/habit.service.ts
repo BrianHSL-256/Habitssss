@@ -42,8 +42,10 @@ const toObjectId = (id: string, field = 'id'): Types.ObjectId => {
 
 /** La categoría debe existir, ser del usuario y no estar archivada */
 const assertCategoryOwnership = async (
+
   userId: string,
   categoryId?: string | null,
+
 ): Promise<Types.ObjectId | null> => {
   if (!categoryId) return null;
 
@@ -52,6 +54,7 @@ const assertCategoryOwnership = async (
     _id,
     userId: toObjectId(userId, 'userId'),
     archivedAt: null,
+    
   }).lean();
 
   if (!category) {

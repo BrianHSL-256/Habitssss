@@ -17,6 +17,7 @@ export const upsert = async (req: AuthRequest, res: Response, next: NextFunction
     checkValidation(req);
 
     const log = await registerService.upsertLog(req.userId!, req.body);
+    
     return res.status(201).json({ register: log });
   } catch (error) {
     return next(error);

@@ -1,8 +1,11 @@
 import { Types, isValidObjectId } from 'mongoose';
-import { HabitRegister, IHabitRegister, toUtcMidnight } from '../models/HabitRegister.model'; 
+import { HabitRegister, toUtcMidnight } from '../models/HabitRegister.model';
+import type { IHabitRegister } from '../models/HabitRegister.model';
 import { Habit } from '../models/Habit.model';
+import type { IHabit } from '../models/Habit.model';
 import { AppError } from '../errors/AppError';
 import { localDayKey } from '../utils/date';
+import { evaluateCompletion } from '../utils/habitCompletion';
 
 /* ============================================================
    TIPOS DE ENTRADA
@@ -48,13 +51,17 @@ const assertDayKey = (s: string, campo: string): void => {
   }
 };
 
-/** El hábito debe existir, ser del usuario y estar vivo */
-const assertOwnHabit = async (userId: OwnerId, habitId: string) => {
+/**
+ * El hábito debe existir, ser del usuario y estar vivo.
+ * Trae los campos de META (incluidos los de rango): sin ellos no se puede
+ * evaluar el cumplimiento en el servidor.
+ */
+const assertOwnHabit = async (userId: OwnerId, habitId: string): Promise<IHabit> => {
   assertObjectId(habitId, 'habitId');
 
   const habit = await Habit.findOne({ _id: habitId, userId, archivedAt: null })
-    .select('trackingType')
-    .lean();
+    .select('trackingType targetValue targetValueMax targetTime targetTimeMax unit')
+    .lean<IHabit>();
 
   if (!habit) {
     throw new AppError('Habit not found', 404, 'HABIT_NOT_FOUND');
@@ -63,18 +70,51 @@ const assertOwnHabit = async (userId: OwnerId, habitId: string) => {
   return habit;
 };
 
-/** Whitelist de campos editables + regla de completedAt */
-const pickWritableFields = (input: UpdateLogInput) => {
+/** 'HH:mm' o Date → minutos desde medianoche */
+const hourToMinutes = (hour: string | Date): number => {
+  if (typeof hour === 'string') {
+    const [h, m] = hour.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  }
+  return hour.getUTCHours() * 60 + hour.getUTCMinutes();
+};
+
+/**
+ * Whitelist de campos editables.
+ *
+ * `completed` NO se toma del cliente: se calcula en el servidor comparando
+ * el valor real contra la meta del hábito (soporta rangos). Así el resultado
+ * es consistente aunque el front se equivoque o alguien pegue a la API directo.
+ */
+const buildWriteData = (
+  habit: IHabit,
+  input: UpdateLogInput,
+  current?: Pick<IHabitRegister, 'value' | 'timeMinutes' | 'completed'> | null,
+) => {
   const data: Partial<IHabitRegister> = {};
 
-  if (input.completed !== undefined) {
-    data.completed = Boolean(input.completed);
-    data.completedAt = data.completed ? new Date() : null;
-  }
   if (input.value !== undefined) data.value = input.value;
   if (input.timeMinutes !== undefined) data.timeMinutes = input.timeMinutes;
-  if (input.hour !== undefined) data.hour = input.hour === null ? null : new Date(input.hour);
   if (input.note !== undefined) data.note = input.note;
+
+  if (input.hour !== undefined) {
+    data.hour = input.hour === null ? null : new Date(input.hour);
+    // Deriva timeMinutes de la hora si no vino explícito
+    if (input.hour !== null && input.timeMinutes === undefined) {
+      data.timeMinutes = hourToMinutes(input.hour);
+    }
+  }
+
+  // Mezcla lo nuevo con lo que ya había guardado para evaluar el estado final
+  const evaluated = evaluateCompletion(habit, {
+    completed: input.completed ?? current?.completed,
+    value: data.value !== undefined ? data.value : current?.value,
+    timeMinutes:
+      data.timeMinutes !== undefined ? data.timeMinutes : current?.timeMinutes,
+  });
+
+  data.completed = evaluated;
+  data.completedAt = evaluated ? new Date() : null;
 
   return data;
 };
@@ -84,7 +124,7 @@ const pickWritableFields = (input: UpdateLogInput) => {
    ============================================================ */
 
 export const upsertLog = async (userId: OwnerId, input: LogInput) => {
-  await assertOwnHabit(userId, input.habitId);
+  const habit = await assertOwnHabit(userId, input.habitId);
 
   let dayKey: string;
   if (input.date === undefined) {
@@ -97,7 +137,14 @@ export const upsertLog = async (userId: OwnerId, input: LogInput) => {
   }
 
   const logDate = toUtcMidnight(dayKey);
-  const data = pickWritableFields(input);
+
+  // Lee el registro existente: en un update parcial (ej. solo la nota) hay que
+  // reevaluar contra los valores ya guardados, no contra undefined
+  const current = await HabitRegister.findOne({ habitId: input.habitId, logDate })
+    .select('value timeMinutes completed')
+    .lean<Pick<IHabitRegister, 'value' | 'timeMinutes' | 'completed'>>();
+
+  const data = buildWriteData(habit, input, current);
 
   const write = () =>
     HabitRegister.findOneAndUpdate(
@@ -166,11 +213,17 @@ export const listLogsByRange = async (userId: OwnerId, query: RangeQuery) => {
 export const updateLog = async (userId: OwnerId, id: string, input: UpdateLogInput) => {
   assertObjectId(id);
 
-  const data = pickWritableFields(input);
+  // Necesitamos el registro para saber a qué hábito pertenece y qué tenía
+  const current = await HabitRegister.findOne({ _id: id, userId })
+    .select('habitId value timeMinutes completed')
+    .lean();
 
-  if (Object.keys(data).length === 0) {
-    throw new AppError('Nada que actualizar', 400, 'EMPTY_UPDATE');
+  if (!current) {
+    throw new AppError('Register not found', 404, 'REGISTER_NOT_FOUND');
   }
+
+  const habit = await assertOwnHabit(userId, String(current.habitId));
+  const data = buildWriteData(habit, input, current);
 
   const log = await HabitRegister.findOneAndUpdate(
     { _id: id, userId },

@@ -48,6 +48,7 @@ export const create = async (req: AuthRequest, res: Response, next: NextFunction
     const habit = await habitService.createHabit(req.userId!, req.body);
 
     return res.status(201).json({ habit });
+    
   } catch (error) {
     return next(error);
   }
