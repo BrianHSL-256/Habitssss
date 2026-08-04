@@ -16,7 +16,7 @@ type OwnerId = Types.ObjectId | string;
 export interface LogInput {
   habitId: string;
   /** 'YYYY-MM-DD' o Date. Si no viene: hoy en la timezone del usuario */
-  date?: string | Date;
+  logDate?: string | Date;
   timezone?: string;
   completed?: boolean;
   value?: number | null;
@@ -127,13 +127,13 @@ export const upsertLog = async (userId: OwnerId, input: LogInput) => {
   const habit = await assertOwnHabit(userId, input.habitId);
 
   let dayKey: string;
-  if (input.date === undefined) {
+  if (input.logDate === undefined) {
     dayKey = localDayKey(new Date(), input.timezone);
-  } else if (typeof input.date === 'string') {
-    assertDayKey(input.date, 'date');
-    dayKey = input.date;
+  } else if (typeof input.logDate === 'string') {
+    assertDayKey(input.logDate, 'date');
+    dayKey = input.logDate;
   } else {
-    dayKey = input.date.toISOString().slice(0, 10);
+    dayKey = input.logDate.toISOString().slice(0, 10);
   }
 
   const logDate = toUtcMidnight(dayKey);
